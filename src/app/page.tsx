@@ -332,9 +332,9 @@ export default function Home() {
               <p className="text-blue-100 mb-6 max-w-xl mx-auto">
                 Upgrade to Pro for detailed recommendations, competitor benchmarks, and a prioritized action plan to boost your store&apos;s performance.
               </p>
-              <button className="bg-white text-blue-600 px-8 py-3 rounded-xl font-semibold hover:bg-blue-50 transition-colors">
+              <a href="/pricing" className="inline-block bg-white text-blue-600 px-8 py-3 rounded-xl font-semibold hover:bg-blue-50 transition-colors">
                 Get Full Report - $19
-              </button>
+              </a>
               <p className="mt-3 text-sm text-blue-200">One-time payment • Instant delivery</p>
             </div>
           </div>
