@@ -3,6 +3,13 @@ import stripe, { STRIPE_PRODUCTS } from '@/lib/stripe';
 
 export async function POST(request: NextRequest) {
   try {
+    if (!stripe) {
+      return NextResponse.json(
+        { error: 'Payment system not configured. Please contact support.' },
+        { status: 503 }
+      );
+    }
+
     const { plan, email } = await request.json();
 
     if (!plan || !email) {
@@ -58,6 +65,13 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  if (!stripe) {
+    return NextResponse.json(
+      { error: 'Payment system not configured' },
+      { status: 503 }
+    );
+  }
+
   const sessionId = request.nextUrl.searchParams.get('session_id');
   
   if (!sessionId) {
