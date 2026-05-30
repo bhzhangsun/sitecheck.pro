@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Zap, Shield, TrendingUp, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import { Search, Zap, Shield, TrendingUp, Lock, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 
 interface AuditResult {
   url: string;
@@ -9,21 +9,32 @@ interface AuditResult {
   performance: {
     score: number;
     loadTime: string;
+    pageSize: string;
     issues: string[];
   };
   seo: {
     score: number;
     metaTags: boolean;
     headings: boolean;
+    schemaMarkup: boolean;
     issues: string[];
   };
   mobile: {
     score: number;
     responsive: boolean;
+    viewport: boolean;
     issues: string[];
   };
   conversion: {
     score: number;
+    hasCart: boolean;
+    hasReviews: boolean;
+    hasTrustBadges: boolean;
+    issues: string[];
+  };
+  security: {
+    score: number;
+    https: boolean;
     issues: string[];
   };
 }
@@ -42,53 +53,27 @@ export default function Home() {
     setError("");
     setResult(null);
 
-    // Simulate API call - in production this would call your backend
-    await new Promise(resolve => setTimeout(resolve, 2500));
+    try {
+      const response = await fetch('/api/audit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url }),
+      });
 
-    // Generate mock results based on URL
-    const mockResult: AuditResult = {
-      url: url,
-      score: Math.floor(Math.random() * 30) + 60, // 60-90 range
-      performance: {
-        score: Math.floor(Math.random() * 25) + 65,
-        loadTime: `${(Math.random() * 2 + 1).toFixed(1)}s`,
-        issues: [
-          "Images not optimized (WebP missing)",
-          "Render-blocking JavaScript detected",
-          "No lazy loading for below-fold images"
-        ]
-      },
-      seo: {
-        score: Math.floor(Math.random() * 20) + 75,
-        metaTags: Math.random() > 0.3,
-        headings: Math.random() > 0.2,
-        issues: [
-          "Missing meta description on product pages",
-          "Duplicate H1 tags detected",
-          "Alt text missing on 12 images"
-        ]
-      },
-      mobile: {
-        score: Math.floor(Math.random() * 25) + 70,
-        responsive: true,
-        issues: [
-          "Buttons too small for mobile (44px recommended)",
-          "Text too small to read on mobile",
-          "Viewport meta tag present ✓"
-        ]
-      },
-      conversion: {
-        score: Math.floor(Math.random() * 30) + 60,
-        issues: [
-          "No trust badges on checkout",
-          "Add to Cart button below fold on mobile",
-          "No urgency elements (countdown, stock)"
-        ]
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to audit website');
       }
-    };
 
-    setResult(mockResult);
-    setLoading(false);
+      const data = await response.json();
+      setResult(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getScoreColor = (score: number) => {
@@ -121,10 +106,10 @@ export default function Home() {
           <form onSubmit={runAudit} className="max-w-2xl mx-auto">
             <div className="flex flex-col sm:flex-row gap-3">
               <input
-                type="url"
+                type="text"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                placeholder="Enter your Shopify store URL (e.g., mystore.myshopify.com)"
+                placeholder="Enter your store URL (e.g., mystore.com)"
                 className="flex-1 px-6 py-4 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
               />
@@ -174,7 +159,7 @@ export default function Home() {
             </div>
 
             {/* Detailed Scores */}
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {/* Performance */}
               <div className="bg-white rounded-xl shadow p-6">
                 <div className="flex items-center gap-3 mb-4">
@@ -188,11 +173,16 @@ export default function Home() {
                     </span>
                   </div>
                 </div>
-                <p className="text-sm text-slate-600 mb-3">Load time: {result.performance.loadTime}</p>
+                <p className="text-sm text-slate-600 mb-2">Load: {result.performance.loadTime}</p>
+                <p className="text-sm text-slate-600 mb-3">Size: {result.performance.pageSize}</p>
                 <ul className="space-y-2">
-                  {result.performance.issues.map((issue, i) => (
+                  {result.performance.issues.slice(0, 3).map((issue, i) => (
                     <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
-                      <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                      {issue.includes('good') || issue.includes('✓') ? (
+                        <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                      )}
                       {issue}
                     </li>
                   ))}
@@ -212,18 +202,25 @@ export default function Home() {
                     </span>
                   </div>
                 </div>
-                <div className="flex gap-4 mb-3 text-sm">
-                  <span className={result.seo.metaTags ? "text-green-600" : "text-red-600"}>
-                    {result.seo.metaTags ? "✓ Meta tags" : "✗ Meta tags"}
+                <div className="flex flex-wrap gap-2 mb-3 text-sm">
+                  <span className={result.seo.metaTags ? "text-green-600 bg-green-50 px-2 py-1 rounded" : "text-red-600 bg-red-50 px-2 py-1 rounded"}>
+                    {result.seo.metaTags ? "✓ Meta" : "✗ Meta"}
                   </span>
-                  <span className={result.seo.headings ? "text-green-600" : "text-red-600"}>
-                    {result.seo.headings ? "✓ Headings" : "✗ Headings"}
+                  <span className={result.seo.headings ? "text-green-600 bg-green-50 px-2 py-1 rounded" : "text-red-600 bg-red-50 px-2 py-1 rounded"}>
+                    {result.seo.headings ? "✓ H1" : "✗ H1"}
+                  </span>
+                  <span className={result.seo.schemaMarkup ? "text-green-600 bg-green-50 px-2 py-1 rounded" : "text-amber-600 bg-amber-50 px-2 py-1 rounded"}>
+                    {result.seo.schemaMarkup ? "✓ Schema" : "Schema"}
                   </span>
                 </div>
                 <ul className="space-y-2">
-                  {result.seo.issues.map((issue, i) => (
+                  {result.seo.issues.slice(0, 3).map((issue, i) => (
                     <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
-                      <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                      {issue.includes('covered') || issue.includes('good') ? (
+                        <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                      )}
                       {issue}
                     </li>
                   ))}
@@ -247,9 +244,9 @@ export default function Home() {
                   {result.mobile.responsive ? "✓ Mobile responsive" : "✗ Not mobile responsive"}
                 </p>
                 <ul className="space-y-2">
-                  {result.mobile.issues.map((issue, i) => (
+                  {result.mobile.issues.slice(0, 3).map((issue, i) => (
                     <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
-                      {issue.includes("✓") ? (
+                      {issue.includes('✓') || issue.includes('good') ? (
                         <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
                       ) : (
                         <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
@@ -273,10 +270,55 @@ export default function Home() {
                     </span>
                   </div>
                 </div>
+                <div className="flex flex-wrap gap-2 mb-3 text-sm">
+                  <span className={result.conversion.hasCart ? "text-green-600 bg-green-50 px-2 py-1 rounded" : "text-red-600 bg-red-50 px-2 py-1 rounded"}>
+                    {result.conversion.hasCart ? "✓ Cart" : "✗ Cart"}
+                  </span>
+                  <span className={result.conversion.hasReviews ? "text-green-600 bg-green-50 px-2 py-1 rounded" : "text-amber-600 bg-amber-50 px-2 py-1 rounded"}>
+                    {result.conversion.hasReviews ? "✓ Reviews" : "Reviews"}
+                  </span>
+                  <span className={result.conversion.hasTrustBadges ? "text-green-600 bg-green-50 px-2 py-1 rounded" : "text-amber-600 bg-amber-50 px-2 py-1 rounded"}>
+                    {result.conversion.hasTrustBadges ? "✓ Trust" : "Trust"}
+                  </span>
+                </div>
                 <ul className="space-y-2">
-                  {result.conversion.issues.map((issue, i) => (
+                  {result.conversion.issues.slice(0, 3).map((issue, i) => (
                     <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
-                      <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                      {issue.includes('detected') || issue.includes('good') ? (
+                        <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                      )}
+                      {issue}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Security */}
+              <div className="bg-white rounded-xl shadow p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-red-100 rounded-lg">
+                    <Lock className="w-6 h-6 text-red-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-slate-900">Security</h3>
+                    <span className={`text-2xl font-bold ${getScoreColor(result.security.score)}`}>
+                      {result.security.score}/100
+                    </span>
+                  </div>
+                </div>
+                <p className="text-sm text-slate-600 mb-3">
+                  {result.security.https ? "✓ HTTPS enabled" : "✗ HTTPS not enabled"}
+                </p>
+                <ul className="space-y-2">
+                  {result.security.issues.slice(0, 3).map((issue, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
+                      {issue.includes('good') ? (
+                        <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+                      )}
                       {issue}
                     </li>
                   ))}
@@ -306,7 +348,7 @@ export default function Home() {
             <h2 className="text-3xl font-bold text-center text-slate-900 mb-12">
               What We Analyze
             </h2>
-            <div className="grid md:grid-cols-4 gap-8">
+            <div className="grid md:grid-cols-5 gap-8">
               <div className="text-center">
                 <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                   <Zap className="w-8 h-8 text-blue-600" />
@@ -334,6 +376,13 @@ export default function Home() {
                 </div>
                 <h3 className="font-semibold text-slate-900 mb-2">Conversion</h3>
                 <p className="text-slate-600 text-sm">Checkout flow, trust signals, and CTA optimization</p>
+              </div>
+              <div className="text-center">
+                <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <Lock className="w-8 h-8 text-red-600" />
+                </div>
+                <h3 className="font-semibold text-slate-900 mb-2">Security</h3>
+                <p className="text-slate-600 text-sm">HTTPS, SSL certificates, and data protection</p>
               </div>
             </div>
           </div>
